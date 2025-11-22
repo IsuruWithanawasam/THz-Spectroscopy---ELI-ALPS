@@ -1,0 +1,15 @@
+4.3mJ before setup, 3.5 mJ before crystal
+
+WG - wire grid
+
+30 degree WG, THz 1.78V, as high field
+
+averaged waveform > FFT > imag > angle > unwrap > phase
+
+air GUI pos 64.64
+sam GUI pos 65.38
+
+after using THz camera, laser engergy dropped, 3.5mJ before setup
+85 degree WG, THz 278 mV, as low field
+
+sample thickness 0.5mm
