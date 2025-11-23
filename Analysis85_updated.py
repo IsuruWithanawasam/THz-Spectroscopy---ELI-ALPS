@@ -139,7 +139,6 @@ t_s_sam = t_ps_sam * 1e-12
 
 
 
-
 def compute_fft(time_s, signal, N_new=None):
     N = len(signal)
     dt = time_s[1] - time_s[0]
@@ -166,10 +165,14 @@ def compute_fft(time_s, signal, N_new=None):
 N_FFT = 16384 
 
 
-freq, Eref_w = compute_fft(time_s_ref, S_ref, N_new=N_FFT) 
-_, Esam_w = compute_fft(time_s_sam, S_sam, N_new=N_FFT) 
+freq, Eref_w = compute_fft(t_s_ref, S_ref2, N_new=N_FFT) 
+_, Esam_w = compute_fft(t_s_sam, S_sam2, N_new=N_FFT) 
 
 
+
+freq=freq[1:]
+Eref_w=Eref_w[1:]
+Esam_w=Esam_w[1:]
 
 freq_THz = freq / 1e12 
 
@@ -183,8 +186,8 @@ amp_sam = np.abs(Esam_w)
 
 
 
-"""
 
+"""
 plt.figure(figsize=(10, 4))
 plt.plot(freq_THz, Eref_w, label='Air', color='blue')
 plt.plot(freq_THz, Esam_w, label='Sample', color='red')
@@ -211,6 +214,12 @@ plt.show()
 
 T_w = Esam_w / Eref_w   # Complex ratio
 
+
+#freq_THz=freq_THz[1:]
+#freq=freq[1:]
+#T_w=T_w[1:]
+
+
 phi_w=np.unwrap(np.angle(T_w)) #phase
 T_amp = np.abs(T_w)     # Magnitude
 
@@ -220,13 +229,14 @@ d = 0.5e-3  #
 omega = 2 * np.pi * freq
 
 # ------------------- Refractive Index --------------------
-n_w = 1 + (phi_w * c) / (omega *d)
+n_w = 1 - (phi_w * c) / (omega *d)
 
 #print(n_w)
 print(max(n_w[1:]))
 
 # ------------------- Absorption Coefficient --------------------
 alpha_w = -(2 / d) * np.log(((n_w + 1)**2 / (4 * n_w)) * T_amp)
+
 
 # ------------------- Plot Refractive Index --------------------
 plt.figure(figsize=(8, 5))
@@ -248,75 +258,3 @@ plt.grid(True)
 plt.tight_layout()
 plt.show()
 
-
-# ... [Previous calculation parts remain the same] ...
-
-# 1. Auto-detect Cutoff (Logic remains the same)
-high_freq_threshold = 3.5
-noise_indices = np.where(freq_THz > high_freq_threshold)[0]
-if len(noise_indices) > 0:
-    noise_level = np.mean(amp_ref[noise_indices])
-else:
-    noise_level = np.mean(amp_ref[-int(len(amp_ref)*0.1):])
-
-# 2. Dynamic Range Limit Calculation (Remains the same)
-dynamic_range = amp_ref / noise_level
-# Avoid division by zero in n_w if present by using a mask or ignoring index 0 later
-T_fr = (4 * n_w) / ((n_w + 1)**2)
-valid_dr_mask = (dynamic_range * T_fr) > 1
-alpha_max_detectable = np.zeros_like(freq_THz)
-# Use 'where' to avoid log warnings on invalid data
-alpha_max_detectable[valid_dr_mask] = (2 / d) * np.log(dynamic_range[valid_dr_mask] * T_fr[valid_dr_mask])
-
-# 3. Cutoff Index
-snr_threshold = 3.0
-# Find where signal drops below threshold *after* the peak
-peak_idx = np.argmax(amp_ref)
-low_snr_region = np.where(amp_ref[peak_idx:] < (noise_level * snr_threshold))[0]
-
-if len(low_snr_region) > 0:
-    cutoff_idx = peak_idx + low_snr_region[0]
-else:
-    cutoff_idx = len(freq_THz)
-
-print(f"Auto-detected Cutoff Frequency: {freq_THz[cutoff_idx]:.2f} THz")
-
-# --- FIX 1: Slice from index 1 to avoid omega=0 (NaN) issues ---
-freq_clean = freq_THz[1:cutoff_idx]
-n_clean = n_w[1:cutoff_idx]
-alpha_clean = alpha_w[1:cutoff_idx]
-alpha_max_clean = alpha_max_detectable[1:cutoff_idx]
-
-# =============================================================================
-#  PLOTTING THE CLEANED RESULTS
-# =============================================================================
-
-# Plot 1: Refractive Index
-plt.figure(figsize=(8, 5))
-plt.plot(freq_clean, n_clean, color='purple', label=r'Refractive Index $n(\omega)$')
-plt.xlabel('Frequency (THz)')
-plt.ylabel('Refractive Index')
-plt.title('Refractive Index (Reliable Bandwidth)')
-plt.grid(True)
-plt.xlim(0, freq_clean[-1])
-plt.legend()
-plt.tight_layout()
-plt.show()
-
-# Plot 2: Absorption Coefficient
-plt.figure(figsize=(8, 5))
-plt.plot(freq_clean, alpha_clean, color='green', label=r'Measured $\alpha(\omega)$')
-plt.plot(freq_clean, alpha_max_clean, color='gray', linestyle='--', label='Max Detectable Limit')
-
-plt.xlabel('Frequency (THz)')
-# --- FIX 2: Use raw string r'...' for LaTeX symbols ---
-plt.ylabel(r'Absorption Coefficient $\alpha(\omega)$ (1/m)')
-plt.title('Absorption Coefficient vs Frequency')
-plt.xlim(0, freq_clean[-1])
-
-# Use nanmin/nanmax to be safe against any remaining NaNs
-plt.ylim(np.nanmin(alpha_clean), np.nanmax(alpha_clean) * 1.2)
-plt.grid(True)
-plt.legend()
-plt.tight_layout()
-plt.show()
